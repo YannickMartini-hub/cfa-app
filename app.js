@@ -22,7 +22,7 @@ window.addEventListener("error", (e) => {
 // Toute ta progression tient dans un seul objet "state",
 // enregistré dans le navigateur du téléphone.
 const STORE_KEY = "cfa-l1-2027";
-const EXAM_DATE = new Date("2027-02-22T09:00:00");
+const DEFAULT_EXAM = "2027-02-22";
 const TARGET = 0.8; // l'objectif : 80 % par topic
 
 function freshState() {
@@ -31,7 +31,12 @@ function freshState() {
     days: [],      // jours où tu as révisé (pour la série)
     srs: {},       // question id -> { box, due, n, ok, last }
     read: {},      // "moduleId:index" -> true quand une section est lue
-    exams: []      // historique des examens blancs
+    exams: [],     // historique des examens blancs
+    settings: {    // réglages personnels (écran Réglages)
+      name: "",
+      examDate: DEFAULT_EXAM,
+      weak: []     // ids des topics choisis comme points faibles
+    }
   };
 }
 let state = load();
@@ -39,7 +44,10 @@ let state = load();
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    return raw ? Object.assign(freshState(), JSON.parse(raw)) : freshState();
+    if (!raw) return freshState();
+    const s = Object.assign(freshState(), JSON.parse(raw));
+    s.settings = Object.assign(freshState().settings, s.settings || {});
+    return s;
   } catch (e) {
     return freshState(); // stockage bloqué : l'app marche quand même, sans mémoire
   }
@@ -70,6 +78,8 @@ function allQuestions() {
   }
   return list;
 }
+const isWeak = (tid) => state.settings.weak.includes(tid);
+const fmtDate = (iso) => { const d = new Date(iso + "T12:00:00"); return isNaN(d) ? "date ?" : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }); };
 const topicById = (id) => CFA.topics.find((t) => t.id === id);
 const moduleById = (tid, mid) => (CFA.content[tid]?.modules || []).find((m) => m.id === mid);
 
@@ -120,7 +130,9 @@ function dueQuestions() {
   return allQuestions().filter((q) => state.srs[q.id] && state.srs[q.id].due <= d);
 }
 function daysLeft() {
-  return Math.max(0, Math.ceil((EXAM_DATE - new Date()) / 86400000));
+  const d = new Date(state.settings.examDate + "T09:00:00");
+  if (isNaN(d)) return 0;
+  return Math.max(0, Math.ceil((d - new Date()) / 86400000));
 }
 
 // ---------- 4. LES ÉCRANS ------------------------------------
@@ -148,7 +160,7 @@ function setTab(t) {
 
 function render() {
   const cur = stack[stack.length - 1];
-  const views = { home: viewHome, cours: viewCours, topic: viewTopic, module: viewModule, formules: viewFormules, train: viewTrain, exam: viewExam, quiz: viewQuiz, results: viewResults };
+  const views = { home: viewHome, cours: viewCours, topic: viewTopic, module: viewModule, formules: viewFormules, train: viewTrain, exam: viewExam, quiz: viewQuiz, results: viewResults, settings: viewSettings };
   const { title, html, after } = views[cur.view](cur.params);
   const showBack = stack.length > 1;
   $("#app").innerHTML = `
@@ -157,9 +169,11 @@ function render() {
       <h1>${title}</h1>
       <span class="pill hot" title="Série de jours">${streak()} j</span>
       <span class="pill" title="Niveau">Niv. ${level().lvl}</span>
+      ${cur.view === "settings" ? "" : `<button class="back" id="gear" aria-label="Réglages"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>`}
     </header>
     <main>${html}</main>`;
   if (showBack) $("#back").onclick = () => { stopTimer(); back(); };
+  if ($("#gear")) $("#gear").onclick = () => { stopTimer(); go("settings"); };
   document.querySelectorAll(".nav button").forEach((b) => b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"));
   if (after) after();
 }
@@ -172,10 +186,10 @@ function viewHome() {
   const seen = Object.keys(state.srs).length;
   const rows = CFA.topics.map(topicRowHtml).join("");
   return {
-    title: "CFA L1 · fév. 2027",
+    title: state.settings.name ? "Salut " + esc(state.settings.name) : "CFA Level 1",
     html: `
     <section class="hero">
-      <div class="lcd"><div><div class="lbl">Jours avant l'examen</div><div class="big">${daysLeft()}</div></div><div class="lbl">22.02.2027</div></div>
+      <div class="lcd"><div><div class="lbl">Jours avant l'examen</div><div class="big">${daysLeft()}</div></div><div class="lbl">${fmtDate(state.settings.examDate)}</div></div>
       <div class="hero-stats">
         <div><b>${due}</b><span>à revoir</span></div>
         <div><b>${seen}/${total}</b><span>vues</span></div>
@@ -198,9 +212,9 @@ function topicRowHtml(t) {
   const v = s.score;
   const cls = v === null ? "" : v >= TARGET ? "ok" : v >= 0.6 ? "mid" : "low";
   return `<div class="card tap topic-row" data-topic="${t.id}" role="button" tabindex="0">
-    <div class="code ${t.priority ? "prio" : ""}">${t.code}</div>
+    <div class="code ${isWeak(t.id) ? "prio" : ""}">${t.code}</div>
     <div style="min-width:0">
-      <div class="row" style="gap:6px"><b>${t.name}</b>${t.priority ? `<span class="tag prio">point faible</span>` : ""}${t.changed2027 ? `<span class="tag new">2027</span>` : ""}</div>
+      <div class="row" style="gap:6px"><b>${t.name}</b>${isWeak(t.id) ? `<span class="tag prio">point faible</span>` : ""}${t.changed2027 ? `<span class="tag new">2027</span>` : ""}</div>
       <div class="small muted">${t.weight} · ${has ? `${s.done}/${s.total} QCM faits` : "contenu à venir"}</div>
       <div class="gauge"><i class="${cls}" style="width:${v === null ? 0 : Math.round(v * 100)}%"></i></div>
     </div>
@@ -211,9 +225,11 @@ function topicRowHtml(t) {
 function dailySet() {
   const due = shuffle(dueQuestions());
   const unseen = allQuestions().filter((q) => !state.srs[q.id]);
-  const PRIO = ["fsa-taxes", "eth-code"]; // tes deux points faibles passent en premier
-  const prio = shuffle(unseen.filter((q) => PRIO.includes(q.m)));
-  const rest = shuffle(unseen.filter((q) => !PRIO.includes(q.m)));
+  // tes points faibles (choisis dans Réglages) passent en premier, modules clés en tête
+  const weak = unseen.filter((q) => isWeak(q.t));
+  const key = (q) => (moduleById(q.t, q.m) || {}).priority ? 0 : 1;
+  const prio = shuffle(weak).sort((a, b) => key(a) - key(b));
+  const rest = shuffle(unseen.filter((q) => !isWeak(q.t)));
   return due.concat(prio, rest).slice(0, 15);
 }
 
@@ -245,7 +261,7 @@ function viewTopic({ id }) {
     const read = m.sections.filter((_, i) => state.read[m.id + ":" + i]).length;
     const qs = c.questions.filter((q) => q.m === m.id);
     return `<div class="card tap" data-mod="${m.id}" role="button" tabindex="0">
-      <div class="row" style="justify-content:space-between"><span class="eyebrow">${m.lm}</span>${m.priority ? `<span class="tag prio">priorité</span>` : ""}</div>
+      <div class="row" style="justify-content:space-between"><span class="eyebrow">${m.lm}</span>${m.priority ? `<span class="tag prio">module clé</span>` : ""}</div>
       <h3 style="margin-top:4px">${m.title}</h3>
       <p class="small muted" style="margin:0 0 8px">${m.summary}</p>
       <div class="small muted">${read}/${m.sections.length} sections lues · ${qs.length} questions</div>
@@ -411,6 +427,86 @@ function viewExam() {
       $("#start").onclick = () => {
         const qs = shuffle(allQuestions().filter((q) => q.type === "mcq")).slice(0, examLen);
         startQuiz(qs, "Examen blanc", { exam: true });
+      };
+    }
+  };
+}
+
+
+// ----- RÉGLAGES
+let pendingReset = null; // bouton de remise à zéro en attente de confirmation
+function viewSettings() {
+  const st = state.settings;
+  const weak = CFA.topics.map((t) => `<label class="check"><input type="checkbox" data-weak="${t.id}" ${isWeak(t.id) ? "checked" : ""}><span><b>${t.code}</b> ${t.name}</span></label>`).join("");
+  const nRead = Object.keys(state.read).length, nQ = Object.keys(state.srs).length;
+  return {
+    title: "Réglages",
+    html: `<div class="stack">
+      <div class="card stack">
+        <h3>Toi</h3>
+        <label class="eyebrow" for="s-name">Prénom (facultatif)</label>
+        <input class="field" id="s-name" type="text" maxlength="30" value="${esc(st.name)}" placeholder="Ex. Yannick">
+        <label class="eyebrow" for="s-date">Date de ton examen</label>
+        <input class="field" id="s-date" type="date" value="${esc(st.examDate)}">
+        <span class="eyebrow">Tes points faibles</span>
+        <p class="small muted" style="margin:0">Ils sont marqués sur l'accueil et passent en premier dans la session du jour.</p>
+        <div class="checks">${weak}</div>
+        <button class="btn primary" id="s-save">Enregistrer</button>
+      </div>
+
+      <div class="card stack">
+        <h3>Remettre à zéro</h3>
+        <p class="small muted" style="margin:0">${nQ} questions avec un historique, ${nRead} sections de cours marquées comme lues. Tes réglages ne sont jamais effacés.</p>
+        <button class="btn" data-reset="questions">Effacer mes réponses aux questions</button>
+        <button class="btn" data-reset="cours">Effacer ma lecture des cours</button>
+        <button class="btn" data-reset="all">Tout effacer (questions, cours, XP, série, examens)</button>
+      </div>
+
+      <div class="card stack">
+        <h3>Changer d'appareil</h3>
+        <p class="small muted" style="margin:0">Ta progression est enregistrée sur cet appareil seulement. Pour la transférer : copie ton code ici, puis colle-le dans l'app sur l'autre appareil.</p>
+        <button class="btn" id="s-export">Copier mon code de sauvegarde</button>
+        <textarea id="s-code" placeholder="Colle ici un code de sauvegarde"></textarea>
+        <button class="btn" id="s-import">Importer ce code</button>
+      </div>
+    </div>`,
+    after: () => {
+      $("#s-save").onclick = () => {
+        st.name = $("#s-name").value.trim();
+        if ($("#s-date").value) st.examDate = $("#s-date").value;
+        st.weak = [...document.querySelectorAll("[data-weak]")].filter((c) => c.checked).map((c) => c.dataset.weak);
+        save(); toast("Réglages enregistrés");
+      };
+      document.querySelectorAll("[data-reset]").forEach((b) => b.onclick = () => {
+        const kind = b.dataset.reset;
+        if (pendingReset !== kind) { // 1er appui : demander confirmation dans le bouton lui-même
+          pendingReset = kind;
+          document.querySelectorAll("[data-reset]").forEach((x) => x.classList.remove("danger"));
+          b.classList.add("danger"); b.dataset.label = b.dataset.label || b.textContent;
+          document.querySelectorAll("[data-reset]").forEach((x) => { if (x !== b && x.dataset.label) x.textContent = x.dataset.label; });
+          b.textContent = "Appuie encore pour confirmer";
+          return;
+        }
+        pendingReset = null;
+        const keep = state.settings;
+        if (kind === "questions") { state.srs = {}; state.exams = []; }
+        if (kind === "cours") { state.read = {}; }
+        if (kind === "all") { state = freshState(); state.settings = keep; }
+        save(); toast("Remise à zéro effectuée"); render();
+      });
+      $("#s-export").onclick = () => {
+        const code = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+        $("#s-code").value = code;
+        navigator.clipboard?.writeText(code).then(() => toast("Code copié"), () => { $("#s-code").select(); toast("Sélectionne et copie le code"); });
+      };
+      $("#s-import").onclick = () => {
+        try {
+          const data = JSON.parse(decodeURIComponent(escape(atob($("#s-code").value.trim()))));
+          if (!data || typeof data.srs !== "object") throw new Error();
+          state = Object.assign(freshState(), data);
+          state.settings = Object.assign(freshState().settings, data.settings || {});
+          save(); toast("Progression importée"); render();
+        } catch (e) { toast("Ce code n'est pas valide. Recopie-le en entier."); }
       };
     }
   };

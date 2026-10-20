@@ -7,7 +7,7 @@ CFA.content.eth = {
   modules: [
     {
       id: "eth-code", lm: "Clé", title: "Code of Ethics vs Standards : ne plus jamais confondre", priority: true,
-      summary: "Ton point faible n°1. Le Code = 6 principes généraux. Les Standards = 7 familles de règles précises.",
+      summary: "La confusion la plus fréquente en Ethics. Le Code = 6 principes généraux. Les Standards = 7 familles de règles précises.",
       sections: [
         { title: "La différence en une phrase", html: `
 <p>Le <b>Code of Ethics</b> dit <b>qui tu dois être</b> : 6 principes larges, aspirationnels.</p>

@@ -4,7 +4,7 @@
 // À CHAQUE MISE À JOUR du contenu : augmente le numéro de VERSION,
 // sinon le téléphone garde l'ancienne copie.
 // ============================================================
-const VERSION = "cfa-v3";
+const VERSION = "cfa-v4";
 const FILES = [
   "./", "index.html", "styles.css", "app.js", "manifest.json",
   "data/topics.js", "data/eth.js", "data/qm.js", "data/eco.js", "data/ci.js", "data/fsa.js", "data/eq.js", "data/fi.js", "data/der.js", "data/alt.js", "data/pm.js", "data/formulas.js",

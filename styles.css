@@ -277,3 +277,10 @@ select { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(
   .toast { animation: none; }
   * { transition: none !important; }
 }
+
+/* ---------- réglages */
+.field { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; }
+.checks { display: grid; gap: 6px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); cursor: pointer; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+.btn.danger { background: var(--bad); color: #fff; border-color: transparent; }

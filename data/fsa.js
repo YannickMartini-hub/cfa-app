@@ -10,7 +10,7 @@ CFA.content.fsa = {
     // ---------------------------------------------------------- LM9 TAXES
     {
       id: "fsa-taxes", lm: "LM9", title: "Analysis of Income Taxes", priority: true,
-      summary: "Le module qui t'a coûté le plus de points. On le reprend de zéro : deux comptabilités, une seule logique.",
+      summary: "Le module qui fait perdre le plus de points en FSA. On le reprend de zéro : deux comptabilités, une seule logique.",
       sections: [
         { title: "L'idée de départ : deux jeux de comptes", html: `
 <p>Une entreprise calcule son résultat deux fois :</p>
